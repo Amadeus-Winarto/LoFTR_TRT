@@ -3,7 +3,7 @@ import copy
 import torch
 import torch.nn as nn
 
-from .linear_attention import LinearAttention
+from .attention.linear_attention import LinearAttention
 
 
 class LoFTREncoderLayer(nn.Module):
