@@ -2,16 +2,26 @@ import cv2
 import numpy as np
 
 
+# TODO: Edit student_config to include fine-level matching
 def make_student_config(config):
-    student_config = config.copy()
-    student_config["resolution"] = (16, 4)
-    student_config["resnetfpn"]["initial_dim"] = 8
-    student_config["resnetfpn"]["block_dims"] = [8, 16, 32, 32]  # s1, s2, s3
+    """
+    Creates a student config from a teacher config.
 
-    student_config["coarse"]["d_model"] = 32
-    student_config["coarse"]["d_ffn"] = 32
-    student_config["coarse"]["nhead"] = 1
-    student_config["coarse"]["layer_names"] = ["self", "cross"] * 2
+    Args:
+        config (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    student_config = config.copy()
+    # student_config["resolution"] = (16, 4)
+    # student_config["resnetfpn"]["initial_dim"] = 8
+    # student_config["resnetfpn"]["block_dims"] = [8, 16, 32, 32]  # s1, s2, s3
+
+    # student_config["coarse"]["d_model"] = 32
+    # student_config["coarse"]["d_ffn"] = 32
+    # student_config["coarse"]["nhead"] = 1
+    # student_config["coarse"]["layer_names"] = ["self", "cross"] * 2
     return student_config
 
 
