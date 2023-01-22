@@ -89,13 +89,13 @@ def main():
         )
         torch_output = model(dummy_image, dummy_image)
 
-        torch.onnx.export(
+        jit_model = torch.jit.trace(
             model,
             (dummy_image, dummy_image),
-            opt.out_file,
-            verbose=False,
-            opset_version=11,
         )
+        jit_output = jit_model(dummy_image, dummy_image)
+        assert torch.allclose(torch_output[0], jit_output[0], atol=1e-5)
+    print("Pass JIT Tracing")
 
     # model = onnx.load(opt.out_file)
     # onnx.checker.check_model(model)
