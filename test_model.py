@@ -2,6 +2,7 @@ import argparse
 
 import torch
 import torch.nn.utils.prune as prune
+from torch.profiler import profile, record_function, ProfilerActivity
 
 from loftr import LoFTR, default_cfg
 from utils import make_student_config
@@ -96,10 +97,44 @@ def main():
         jit_output = jit_model(dummy_image, dummy_image)
         assert torch.allclose(torch_output[0], jit_output[0], atol=1e-5)
     print("Pass JIT Tracing")
+    return jit_model
 
     # model = onnx.load(opt.out_file)
     # onnx.checker.check_model(model)
 
 
 if __name__ == "__main__":
-    main()
+    # 1. Check Tracing
+    jit_model = main()
+
+    # 2. Profile the model
+    """
+    Profiling the model with torch.profiler
+    Default settings: 
+    Input size: 1x1x240x320
+    Resolution: 8, 2
+    Attention: Linear
+    Backbone: ResNetFPN
+    Note: All measurements are in ms
+    
+    Attention Mechanism
+    method |  CPU  |  GPU  |  JIT
+    ----------------------------
+    Linear | 1496  | 110.4 | 22.172
+    AFT    | 1255  | 125.6 | 17.227
+    
+
+    Backbone
+    method |  CPU  |  GPU  |  JIT
+    ----------------------------
+    ConvNeXT |  2040  |  80.735  |  20.287
+    ResNetFPN |  1796  |  67.020  |  20.646
+    """
+
+    device = "cpu"
+    jit_model = LoFTR(config=default_cfg).to(device=device)
+    dummy_image = torch.randn(1, 1, 240, 320).to(device=device)
+    with profile(activities=[ProfilerActivity.CPU], record_shapes=True) as prof:
+        with record_function("model_inference"):
+            jit_model(dummy_image, dummy_image)
+    print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=10))
