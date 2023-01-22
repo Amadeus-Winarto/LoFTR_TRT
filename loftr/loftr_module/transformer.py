@@ -7,10 +7,11 @@ from .attention.linear_attention import LinearAttention
 
 
 class LoFTREncoderLayer(nn.Module):
-    def __init__(self, batch_size, d_model, nhead):
+    def __init__(self, d_model, nhead, attention="linear"):
         super(LoFTREncoderLayer, self).__init__()
+        if attention != "linear":
+            raise NotImplementedError("Only linear attention is supported")
 
-        self.bs = batch_size
         self.dim = d_model // nhead
         self.nhead = nhead
 
@@ -38,18 +39,15 @@ class LoFTREncoderLayer(nn.Module):
             x (torch.Tensor): [N, L, C]
             source (torch.Tensor): [N, S, C]
         """
+        bs = x.size(0)
         query, key, value = x, source, source
 
         # multi-head attention
-        query = self.q_proj(query).view(
-            self.bs, -1, self.nhead, self.dim
-        )  # [N, L, (H, D)]
-        key = self.k_proj(key).view(self.bs, -1, self.nhead, self.dim)  # [N, S, (H, D)]
-        value = self.v_proj(value).view(self.bs, -1, self.nhead, self.dim)
+        query = self.q_proj(query).view(bs, -1, self.nhead, self.dim)  # [N, L, (H, D)]
+        key = self.k_proj(key).view(bs, -1, self.nhead, self.dim)  # [N, S, (H, D)]
+        value = self.v_proj(value).view(bs, -1, self.nhead, self.dim)
         message = self.attention(query, key, value)  # [N, L, (H, D)]
-        message = self.merge(
-            message.view(self.bs, -1, self.nhead * self.dim)
-        )  # [N, L, C]
+        message = self.merge(message.view(bs, -1, self.nhead * self.dim))  # [N, L, C]
         message = self.norm1(message)
 
         # feed-forward network
@@ -62,7 +60,7 @@ class LoFTREncoderLayer(nn.Module):
 class LocalFeatureTransformer(nn.Module):
     """A Local Feature Transformer (LoFTR) module."""
 
-    def __init__(self, batch_size, config):
+    def __init__(self, config):
         super(LocalFeatureTransformer, self).__init__()
 
         self.config = config
@@ -70,7 +68,7 @@ class LocalFeatureTransformer(nn.Module):
         self.nhead = config["nhead"]
         self.layer_names = config["layer_names"]
         encoder_layer = LoFTREncoderLayer(
-            batch_size, config["d_model"], config["nhead"]
+            config["d_model"], config["nhead"], config["attention"]
         )
         self.layers = nn.ModuleList(
             [copy.deepcopy(encoder_layer) for _ in range(len(self.layer_names))]

@@ -2,9 +2,10 @@ import torch
 import torch.nn as nn
 
 from .backbone import build_backbone
-from .loftr_module import LocalFeatureTransformer
+from .loftr_module import LocalFeatureTransformer, FinePreprocess
 from .utils.coarse_matching import CoarseMatching
 from .utils.position_encoding import PositionEncodingSine
+from .utils.fine_matching import FineMatching
 
 
 class LoFTR(nn.Module):
@@ -18,12 +19,13 @@ class LoFTR(nn.Module):
         self.pos_encoding = PositionEncodingSine(
             config["coarse"]["d_model"], temp_bug_fix=config["coarse"]["temp_bug_fix"]
         )
-        self.loftr_coarse = LocalFeatureTransformer(
-            self.config["input_batch_size"], config["coarse"]
-        )
+        self.loftr_coarse = LocalFeatureTransformer(config["coarse"])
         self.coarse_matching = CoarseMatching(
             config["match_coarse"], config["coarse"]["d_model"]
         )
+        self.loftr_fine = LocalFeatureTransformer(config["fine"])
+        self.fine_preprocess = FinePreprocess(config)
+        self.fine_matching = FineMatching()
 
     def backbone_forward(self, img0, img1):
         """
@@ -32,10 +34,11 @@ class LoFTR(nn.Module):
         """
 
         # we assume that data['hw0_i'] == data['hw1_i'] - faster & better BN convergence
-        feats_c, feats_f = self.backbone(torch.cat([img0, img1], dim=0))
+        feats_c, feats_f = self.backbone(torch.cat([img0, img1], dim=0))  # type: ignore
 
-        bs = self.config["input_batch_size"]
-        (feat_c0, feat_c1), (feat_f0, feat_f1) = feats_c.split(bs), feats_f.split(bs)
+        (feat_c0, feat_c1), (feat_f0, feat_f1) = feats_c.split(
+            img0.shape[0]
+        ), feats_f.split(img0.shape[0])
 
         return feat_c0, feat_f0, feat_c1, feat_f1
 
@@ -45,7 +48,14 @@ class LoFTR(nn.Module):
         'img1': (torch.Tensor): (N, 1, H, W)
         """
         # 1. Local Feature CNN
+        hw0_i = img0.shape[2:]
+        hw1_i = img1.shape[2:]
+
         feat_c0, feat_f0, feat_c1, feat_f1 = self.backbone_forward(img0, img1)
+        hw0_c = feat_c0.shape[2:]
+        hw1_c = feat_c1.shape[2:]
+        hw0_f = feat_f0.shape[2:]
+        # hw1_f = feat_f1.shape[2:]
 
         # 2. coarse-level loftr module
         # add featmap with positional encoding, then flatten it to sequence [N, HW, C]
@@ -57,7 +67,32 @@ class LoFTR(nn.Module):
         feat_c0, feat_c1 = self.loftr_coarse(feat_c0, feat_c1)
 
         # 3. match coarse-level
-        conf_matrix, sim_matrix = self.coarse_matching(feat_c0, feat_c1)
+        (
+            conf_matrix,
+            sim_matrix,
+            gt_mask,
+            b_ids,
+            i_ids,
+            j_ids,
+            m_bids,
+            mkpts0_c,
+            mkpts1_c,
+            mconf,
+        ) = self.coarse_matching.forward(feat_c0, feat_c1, hw0_i, hw1_i, hw0_c, hw1_c)
+
+        # 4. fine-level loftr module
+        feat_f0_unfold, feat_f1_unfold = self.fine_preprocess.forward(
+            feat_f0, feat_f1, feat_c0, feat_c1, hw0_f, hw0_c, b_ids, i_ids, j_ids
+        )
+        if feat_f0_unfold.size(0) != 0:  # at least one coarse level predicted
+            feat_f0_unfold, feat_f1_unfold = self.loftr_fine(
+                feat_f0_unfold, feat_f1_unfold
+            )
+
+        # 5. Match fine-level
+        self.fine_matching.forward(
+            feat_f0_unfold, feat_f1_unfold, mconf, mkpts0_c, mkpts1_c, hw0_i, hw1_i
+        )
 
         return conf_matrix, sim_matrix
 
