@@ -13,15 +13,12 @@ def build_attention(attention="linear"):
     elif attention == "aft":
         return AFTSimple
     else:
-        raise NotImplementedError("Only linear attention is supported")
+        raise NotImplementedError(f"Mechanism: {attention} is not implemented.")
 
 
 class LoFTREncoderLayer(nn.Module):
     def __init__(self, d_model, nhead, attention="linear"):
         super(LoFTREncoderLayer, self).__init__()
-        if attention != "linear":
-            raise NotImplementedError("Only linear attention is supported")
-
         self.dim = d_model // nhead
         self.nhead = nhead
 
