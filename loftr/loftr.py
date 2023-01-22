@@ -90,11 +90,11 @@ class LoFTR(nn.Module):
             )
 
         # 5. Match fine-level
-        self.fine_matching.forward(
+        expec_f, mkptsf_0, mkptsf_1 = self.fine_matching.forward(
             feat_f0_unfold, feat_f1_unfold, mconf, mkpts0_c, mkpts1_c, hw0_i, hw1_i
         )
 
-        return conf_matrix, sim_matrix
+        return mkptsf_0, mkptsf_1, conf_matrix  # , sim_matrix, mkptsf_0, mkptsf_1
 
     def load_state_dict(self, state_dict, *args, **kwargs):
         for k in list(state_dict.keys()):
