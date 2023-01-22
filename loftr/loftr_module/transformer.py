@@ -4,6 +4,16 @@ import torch
 import torch.nn as nn
 
 from .attention.linear_attention import LinearAttention
+from .attention.attention_free import AFTSimple
+
+
+def build_attention(attention="linear"):
+    if attention == "linear":
+        return LinearAttention
+    elif attention == "aft":
+        return AFTSimple
+    else:
+        raise NotImplementedError("Only linear attention is supported")
 
 
 class LoFTREncoderLayer(nn.Module):
@@ -19,7 +29,7 @@ class LoFTREncoderLayer(nn.Module):
         self.q_proj = nn.Linear(d_model, d_model, bias=False)
         self.k_proj = nn.Linear(d_model, d_model, bias=False)
         self.v_proj = nn.Linear(d_model, d_model, bias=False)
-        self.attention = LinearAttention(self.nhead, self.dim)
+        self.attention = build_attention(attention)(self.nhead, self.dim)
         self.merge = nn.Linear(d_model, d_model, bias=False)
 
         # feed-forward network
