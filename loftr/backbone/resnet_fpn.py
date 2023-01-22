@@ -16,14 +16,25 @@ def conv3x3(in_planes, out_planes, stride=1):
     )
 
 
+def get_activation(activation):
+    if activation == "relu":
+        return nn.ReLU(inplace=True)
+    elif activation == "leaky_relu":
+        return nn.LeakyReLU()
+    elif activation == "gelu":
+        return nn.GELU()
+    else:
+        raise NotImplementedError
+
+
 class BasicBlock(nn.Module):
-    def __init__(self, in_planes, planes, stride=1):
+    def __init__(self, in_planes, planes, stride=1, activation="relu"):
         super().__init__()
         self.conv1 = conv3x3(in_planes, planes, stride)
         self.conv2 = conv3x3(planes, planes)
         self.bn1 = nn.BatchNorm2d(planes)
         self.bn2 = nn.BatchNorm2d(planes)
-        self.relu = nn.ReLU(inplace=True)
+        self.activation = get_activation(activation)
 
         if stride == 1:
             self.downsample = None
@@ -34,13 +45,13 @@ class BasicBlock(nn.Module):
 
     def forward(self, x):
         y = x
-        y = self.relu(self.bn1(self.conv1(y)))
+        y = self.activation(self.bn1(self.conv1(y)))
         y = self.bn2(self.conv2(y))
 
         if self.downsample is not None:
             x = self.downsample(x)
 
-        return self.relu(x + y)
+        return self.activation(x + y)
 
 
 class ResNetFPN_8_2(nn.Module):
@@ -49,7 +60,7 @@ class ResNetFPN_8_2(nn.Module):
     Each block has 2 layers.
     """
 
-    def __init__(self, config):
+    def __init__(self, config, activation="relu"):
         super().__init__()
         # Config
         block = BasicBlock
@@ -64,7 +75,7 @@ class ResNetFPN_8_2(nn.Module):
             1, initial_dim, kernel_size=7, stride=2, padding=3, bias=False
         )
         self.bn1 = nn.BatchNorm2d(initial_dim)
-        self.relu = nn.ReLU(inplace=True)
+        self.activation = get_activation(activation)
 
         self.layer1 = self._make_layer(block, block_dims[0], stride=1)  # 1/2
         self.layer2 = self._make_layer(block, block_dims[1], stride=2)  # 1/4
@@ -76,20 +87,22 @@ class ResNetFPN_8_2(nn.Module):
         self.layer2_outconv2 = nn.Sequential(
             conv3x3(block_dims[2], block_dims[2]),
             nn.BatchNorm2d(block_dims[2]),
-            nn.LeakyReLU(),
+            get_activation("leaky_relu"),
             conv3x3(block_dims[2], block_dims[1]),
         )
         self.layer1_outconv = conv1x1(block_dims[0], block_dims[1])
         self.layer1_outconv2 = nn.Sequential(
             conv3x3(block_dims[1], block_dims[1]),
             nn.BatchNorm2d(block_dims[1]),
-            nn.LeakyReLU(),
+            get_activation("leaky_relu"),
             conv3x3(block_dims[1], block_dims[0]),
         )
 
         for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
+            if isinstance(m, nn.Conv2d) and activation in ["relu", "leaky_relu"]:
+                nn.init.kaiming_normal_(
+                    m.weight, mode="fan_out", nonlinearity=activation
+                )
             elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
@@ -104,7 +117,7 @@ class ResNetFPN_8_2(nn.Module):
 
     def forward(self, x):
         # ResNet Backbone
-        x0 = self.relu(self.bn1(self.conv1(x)))
+        x0 = self.activation(self.bn1(self.conv1(x)))
         x1 = self.layer1(x0)  # 1/2
         x2 = self.layer2(x1)  # 1/4
         x3 = self.layer3(x2)  # 1/8
@@ -138,7 +151,7 @@ class ResNetFPN_16_4(nn.Module):
     Each block has 2 layers.
     """
 
-    def __init__(self, config):
+    def __init__(self, config, activation="relu"):
         super().__init__()
         # Config
         block = BasicBlock
@@ -153,7 +166,7 @@ class ResNetFPN_16_4(nn.Module):
             1, initial_dim, kernel_size=7, stride=2, padding=3, bias=False
         )
         self.bn1 = nn.BatchNorm2d(initial_dim)
-        self.relu = nn.ReLU(inplace=True)
+        self.activation = get_activation(activation)
 
         self.layer1 = self._make_layer(block, block_dims[0], stride=1)  # 1/2
         self.layer2 = self._make_layer(block, block_dims[1], stride=2)  # 1/4
@@ -166,7 +179,7 @@ class ResNetFPN_16_4(nn.Module):
         self.layer3_outconv2 = nn.Sequential(
             conv3x3(block_dims[3], block_dims[3]),
             nn.BatchNorm2d(block_dims[3]),
-            nn.LeakyReLU(),
+            get_activation("leaky_relu"),
             conv3x3(block_dims[3], block_dims[2]),
         )
 
@@ -174,13 +187,15 @@ class ResNetFPN_16_4(nn.Module):
         self.layer2_outconv2 = nn.Sequential(
             conv3x3(block_dims[2], block_dims[2]),
             nn.BatchNorm2d(block_dims[2]),
-            nn.LeakyReLU(),
+            get_activation("leaky_relu"),
             conv3x3(block_dims[2], block_dims[1]),
         )
 
         for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
+            if isinstance(m, nn.Conv2d) and activation in ["relu", "leaky_relu"]:
+                nn.init.kaiming_normal_(
+                    m.weight, mode="fan_out", nonlinearity=activation
+                )
             elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
@@ -195,7 +210,7 @@ class ResNetFPN_16_4(nn.Module):
 
     def forward(self, x):
         # ResNet Backbone
-        x0 = self.relu(self.bn1(self.conv1(x)))
+        x0 = self.activation(self.bn1(self.conv1(x)))
         x1 = self.layer1(x0)  # 1/2
         x2 = self.layer2(x1)  # 1/4
         x3 = self.layer3(x2)  # 1/8
