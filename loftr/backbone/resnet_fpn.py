@@ -1,5 +1,6 @@
 import torch.nn as nn
 import torch.nn.functional as F
+from .common import get_activation
 
 
 def conv1x1(in_planes, out_planes, stride=1):
@@ -14,17 +15,6 @@ def conv3x3(in_planes, out_planes, stride=1):
     return nn.Conv2d(
         in_planes, out_planes, kernel_size=3, stride=stride, padding=1, bias=False
     )
-
-
-def get_activation(activation):
-    if activation == "relu":
-        return nn.ReLU(inplace=True)
-    elif activation == "leaky_relu":
-        return nn.LeakyReLU()
-    elif activation == "gelu":
-        return nn.GELU()
-    else:
-        raise NotImplementedError
 
 
 class BasicBlock(nn.Module):

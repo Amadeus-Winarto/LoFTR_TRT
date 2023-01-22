@@ -1,4 +1,5 @@
 from .resnet_fpn import ResNetFPN_8_2, ResNetFPN_16_4
+from .yolov5_backbone import CSPNet_PANet_8_2, CSPNet_PANet_16_4
 
 
 def build_backbone(config):
