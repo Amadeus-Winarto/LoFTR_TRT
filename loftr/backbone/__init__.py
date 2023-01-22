@@ -1,5 +1,6 @@
 from .resnet_fpn import ResNetFPN_8_2, ResNetFPN_16_4
 from .yolov5_backbone import CSPNet_PANet_8_2, CSPNet_PANet_16_4
+from .convnext_fpn import ConvNeXtFPN_8_2, ConvNeXtFPN_16_4
 
 
 def build_backbone(config):
@@ -8,6 +9,11 @@ def build_backbone(config):
             return ResNetFPN_8_2(config["resnetfpn"])
         elif config["resolution"] == (16, 4):
             return ResNetFPN_16_4(config["resnetfpn"])
+    elif config["backbone_type"] == "ConvNeXtFPN":
+        if config["resolution"] == (8, 2):
+            return ConvNeXtFPN_8_2(config["resnetfpn"])
+        elif config["resolution"] == (16, 4):
+            return ConvNeXtFPN_16_4(config["resnetfpn"])
     else:
         raise ValueError(
             f"LOFTR.BACKBONE_TYPE {config['backbone_type']} not supported."
