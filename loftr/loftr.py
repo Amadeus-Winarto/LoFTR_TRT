@@ -94,7 +94,7 @@ class LoFTR(nn.Module):
             feat_f0_unfold, feat_f1_unfold, mconf, mkpts0_c, mkpts1_c, hw0_i, hw1_i
         )
 
-        return mkptsf_0, mkptsf_1, conf_matrix  # , sim_matrix, mkptsf_0, mkptsf_1
+        return mkptsf_0, mkptsf_1, mconf  # , sim_matrix, mkptsf_0, mkptsf_1
 
     def load_state_dict(self, state_dict, *args, **kwargs):
         for k in list(state_dict.keys()):
